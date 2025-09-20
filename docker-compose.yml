@@ -1,0 +1,97 @@
+# GetVideo Docker Compose Configuration
+# Optimized for 1Panel deployment
+
+version: '3.8'
+
+services:
+  getvideo-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: getvideo:latest
+    container_name: getvideo-app
+    restart: unless-stopped
+    
+    ports:
+      - "${PORT:-3000}:3000"
+    
+    volumes:
+      # 数据持久化存储
+      - ./data:/app/data
+      # 下载文件存储
+      - ./downloads:/app/downloads
+      # 日志文件存储
+      - ./logs:/app/logs
+      # 系统时间同步
+      - /etc/localtime:/etc/localtime:ro
+    
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - DOWNLOAD_PATH=/app/downloads
+      - DATA_PATH=/app/data
+      - NEXT_TELEMETRY_DISABLED=1
+      # 管理配置
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-3}
+      - SESSION_SECRET=${SESSION_SECRET:-change-this-secret-key}
+      - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # 可选：首次部署时的默认管理员账户
+      # - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      # - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    
+    networks:
+      - getvideo-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 1Panel 标签
+    labels:
+      - "com.1panel.name=getvideo"
+      - "com.1panel.description=视频下载应用 - 支持API Key管理"
+      - "com.1panel.category=media"
+      - "com.1panel.version=1.0.0"
+      - "com.1panel.author=GetVideo Team"
+      - "com.1panel.url=http://localhost:3000"
+      - "com.1panel.admin-url=http://localhost:3000/admin/login"
+    
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  getvideo-network:
+    driver: bridge
+    name: getvideo-network
+
+# 可选：添加 Nginx 反向代理（在 1Panel 中可直接配置）
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: getvideo-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - getvideo-app
+  #   networks:
+  #     - getvideo-network
